@@ -5,7 +5,7 @@ This test suite validates the MCPClient library's ability to:
 - Connect to MCP servers over HTTP
 - Perform health checks
 - List available tools
-- Execute complex multi-step scenarios
+- Execute complex multistep scenarios
 
 Environment Variables Required:
     SERVER_URL: Base URL of the MCP server (e.g., "https://example.com")
@@ -120,6 +120,251 @@ async def test_job_management_get_tools(server_config):
     assert 'controller.job_templates_launch_create' in tool_names
     assert 'controller.jobs_read' in tool_names
     assert 'controller.jobs_stdout_read' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_inventory_management_get_tools(server_config):
+    """Test retrieving available tools from the inventory_management category.
+
+    This async test validates that:
+    1. MCPClient can connect to the inventory_management category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected inventory management tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required inventory management tools are available:
+            * controller.inventories_list
+            * controller.hosts_list
+            * controller.hosts_variable_data_read
+    """
+    server_url, api_key = server_config
+
+    # Create client with inventory_management category
+    mcp_lib = MCPClient(server_url, api_key, category="inventory_management")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential inventory management tools are available
+    assert 'controller.inventories_list' in tool_names
+    assert 'controller.hosts_list' in tool_names
+    assert 'controller.hosts_variable_data_read' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_system_monitoring_get_tools(server_config):
+    """Test retrieving available tools from the system_monitoring category.
+
+    This async test validates that:
+    1. MCPClient can connect to the system_monitoring category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected system monitoring tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required system monitoring tools are available:
+            * gateway.status_retrieve
+            * gateway.activitystream_list
+            * gateway.activitystream_retrieve
+    """
+    server_url, api_key = server_config
+
+    # Create client with system monitoring
+    mcp_lib = MCPClient(server_url, api_key, category="system_monitoring")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential system monitoring tools are available
+    assert 'gateway.status_retrieve' in tool_names
+    assert 'gateway.activitystream_list' in tool_names
+    assert 'gateway.activitystream_retrieve' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_user_management_get_tools(server_config):
+    """Test retrieving available tools from the user_management category.
+
+    This async test validates that:
+    1. MCPClient can connect to the user_management category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected user management tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required user management tools are available:
+            * gateway.users_list
+            * gateway.users_create
+            * gateway.users_retrieve
+            * gateway.users_destroy
+    """
+    server_url, api_key = server_config
+
+    # Create client with user management
+    mcp_lib = MCPClient(server_url, api_key, category="user_management")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential user management tools are available
+    assert 'gateway.users_list' in tool_names
+    assert 'gateway.users_create' in tool_names
+    assert 'gateway.users_retrieve' in tool_names
+    assert 'gateway.users_destroy' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_security_compliance_get_tools(server_config):
+    """Test retrieving available tools from the security_compliance category.
+
+    This async test validates that:
+    1. MCPClient can connect to the security_compliance category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected security compliance tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required security compliance tools are available:
+            * controller.credentials_list
+            * controller.credential_types_list
+            * controller.credential_types_read
+            * controller.credential_types_delete
+    """
+    server_url, api_key = server_config
+
+    # Create client with security compliance
+    mcp_lib = MCPClient(server_url, api_key, category="security_compliance")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential security compliance tools are available
+    assert 'controller.credentials_list' in tool_names
+    assert 'controller.credential_types_list' in tool_names
+    assert 'controller.credential_types_read' in tool_names
+    assert 'controller.credential_types_delete' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_platform_configuration_get_tools(server_config):
+    """Test retrieving available tools from the platform_configuration category.
+
+    This async test validates that:
+    1. MCPClient can connect to the platform_configuration category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected platform configuration tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required platform configuration tools are available:
+            * controller.notification_templates_list
+            * controller.notification_templates_create
+            * controller.notification_templates_read
+            * controller.notification_templates_update
+            * controller.notification_templates_delete
+    """
+    server_url, api_key = server_config
+
+    # Create client with platform configuration
+    mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential platform configuration tools are available
+    assert 'controller.notification_templates_list' in tool_names
+    assert 'controller.notification_templates_create' in tool_names
+    assert 'controller.notification_templates_read' in tool_names
+    assert 'controller.notification_templates_update' in tool_names
+    assert 'controller.notification_templates_delete' in tool_names
+
+
+@pytest.mark.asyncio
+async def test_developer_testing_get_tools(server_config):
+    """Test retrieving available tools from the developer_testing category.
+
+    This async test validates that:
+    1. MCPClient can connect to the developer_testing category endpoint
+    2. The get_tools() method successfully lists available tools
+    3. Expected developer testing tools are present in the response
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - At least one tool is returned
+        - Required developer testing tools are available:
+            * controller.workflow_job_templates_launch_create
+            * controller.workflow_jobs_list
+            * controller.workflow_jobs_read
+            * controller.workflow_jobs_workflow_nodes_list
+    """
+    server_url, api_key = server_config
+
+    # Create client with developer_testing category
+    mcp_lib = MCPClient(server_url, api_key, category="developer_testing")
+
+    # Retrieve available tools
+    tools = await mcp_lib.get_tools()
+
+    # Verify we got tools back
+    assert len(tools) > 0
+
+    # Extract tool names for validation
+    tool_names = [tool.name for tool in tools]
+
+    # Verify essential developer testing tools are available
+    assert 'controller.workflow_job_templates_launch_create' in tool_names
+    assert 'controller.workflow_jobs_list' in tool_names
+    assert 'controller.workflow_jobs_read' in tool_names
+    assert 'controller.workflow_jobs_workflow_nodes_list' in tool_names
+
 
 
 @pytest.mark.asyncio
@@ -257,6 +502,124 @@ async def test_job_management_read_write_use_case(server_config):
         # Verify expected content in job output
         # "PLAY [Hello World Sample]" is from the Demo Job Template playbook
         assert "PLAY [Hello World Sample]" in o["content"]
+
+        return
+
+    # Execute the scenario and wait for completion
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_inventory_management_read_only_use_case(server_config):
+    """Test a complete inventory management workflow: list inventories, hosts, and retrieve host variables.
+
+    This comprehensive integration test validates an end-to-end inventory management scenario:
+    1. List all inventories and find "Demo Inventory"
+    2. List all hosts and find "localhost"
+    3. Retrieve and verify variable data for the localhost host
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute read-only inventory queries with the run_a_scenario() method
+    - Navigate through hierarchical inventory data (inventories -> hosts -> variables)
+    - Handle multiple sequential tool calls
+    - Process and validate JSON responses
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Inventories exist on the server
+        - "Demo Inventory" is found
+        - Hosts exist on the server
+        - "localhost" host is found
+        - Host variable data is successfully retrieved
+        - Host configuration matches expected values (ansible_connection, ansible_python_interpreter)
+        - All tool calls return without errors
+
+    Raises:
+        AssertionError: If expected inventories, hosts, or variables are not found
+    """
+    server_url, api_key = server_config
+
+    # Create client for inventory_management category
+    mcp_lib = MCPClient(server_url, api_key, category="inventory_management")
+
+    async def scenario_func(session: ClientSession):
+        """Custom scenario function to execute the complete inventory workflow."""
+
+        # Step 1: List inventories and find the Demo Inventory
+        # This queries the Ansible Automation Platform for available inventories
+        res = await session.call_tool(
+            name="controller.inventories_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        # Verify the tool call succeeded
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        # Parse JSON response
+        o = json.loads("".join(res.content[0].text))
+        assert o["count"] > 0
+
+        # Search for the "Demo Inventory" in results
+        demo_inventory = None
+        for inventory in o["results"]:
+            if inventory["name"] == "Demo Inventory":
+                demo_inventory = inventory
+                break
+
+        # Verify we found the required inventory
+        assert demo_inventory is not None, "Demo Inventory not found on server"
+
+        # Step 2: List hosts and find localhost
+        # This queries all hosts configured in the platform
+        res = await session.call_tool(
+            name="controller.hosts_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        # Verify the tool call succeeded
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        # Parse JSON response
+        o = json.loads("".join(res.content[0].text))
+        assert o["count"] > 0
+
+        # Search for the "localhost" host in results
+        localhost = None
+        for host in o["results"]:
+            if host["name"] == "localhost":
+                localhost = host
+                break
+
+        # Verify we found the required host
+        assert localhost is not None, "localhost not found on server"
+
+        # Step 3: Retrieve variable data for the localhost host
+        # This gets the Ansible variables configured for this specific host
+        res = await session.call_tool(
+            name="controller.hosts_variable_data_read",
+            arguments={
+                "version": "v2",
+                "id": localhost["id"],
+            },
+        )
+        # Verify the tool call succeeded
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        # Parse JSON response containing host variables
+        o = json.loads("".join(res.content[0].text))
+
+        # Verify expected Ansible configuration variables
+        # ansible_connection should be "local" for localhost
+        assert o["ansible_connection"] == "local"
+        # ansible_python_interpreter should use the playbook's Python interpreter
+        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
 
         return
 
