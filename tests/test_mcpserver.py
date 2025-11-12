@@ -120,6 +120,8 @@ async def test_job_management_get_tools(server_config):
     assert 'controller.job_templates_launch_create' in tool_names
     assert 'controller.jobs_read' in tool_names
     assert 'controller.jobs_stdout_read' in tool_names
+    assert 'eda.activation_instances_list' in tool_names
+    assert 'eda.activation_instances_logs_list' in tool_names
 
 
 @pytest.mark.asyncio
@@ -463,6 +465,71 @@ async def test_job_management_read_write_use_case(server_config):
         return
 
     # Execute the scenario and wait for completion
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_job_management_read_only_use_case(server_config):
+    """Test a complete job management workflow: list activation instances and their logs.
+
+    This comprehensive integration test validates an end-to-end job management scenario:
+    1. List all EDA activation instances
+    2. Retrieve logs for all activation instances
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute read-only job monitoring queries with the run_a_scenario() method
+    - Query Event-Driven Ansible (EDA) activation instances and their logs
+    - Handle multiple sequential tool calls in a workflow
+    - Process and validate responses from job management tools
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Each tool call completes without errors (res.isError is False)
+        - Each tool call returns non-empty content
+        - The scenario executes successfully via run_a_scenario()
+    """
+    # Extract server connection details from the fixture
+    server_url, api_key = server_config
+
+    # Create an MCPClient instance configured for the job_management category
+    # This category provides tools for monitoring and managing job executions
+    mcp_lib = MCPClient(server_url, api_key, category="job_management")
+
+    async def scenario_func(session: ClientSession):
+        """Custom scenario function to execute the complete job monitoring workflow.
+
+        This nested function defines a multi-step job management scenario that:
+        1. Retrieves a list of all activation instances to see running/completed jobs
+        2. Fetches logs for activation instances to review execution details
+        """
+
+        # Step 1: List all EDA activation instances
+        # Activation instances represent executions of Event-Driven Ansible rulebooks
+        res = await session.call_tool(
+            name="eda.activation_instances_list",
+            arguments={},
+        )
+        # Verify the tool call succeeded and returned data
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        # Step 2: Retrieve logs for activation instances
+        # These logs contain execution details, triggered rules, and any errors
+        res = await session.call_tool(
+            name="eda.activation_instances_logs_list",
+            arguments={},
+        )
+
+        # Verify the tool call succeeded and returned log data
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        return
+
+    # Execute the scenario and wait for completion
+    # run_a_scenario() manages the session lifecycle and executes the scenario function
     await mcp_lib.run_a_scenario(scenario_func)
 
 
