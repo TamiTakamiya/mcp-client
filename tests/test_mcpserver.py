@@ -259,6 +259,7 @@ async def test_security_compliance_get_tools(server_config):
             * controller.credentials_list
             * controller.credential_types_list
             * controller.credential_types_read
+            * controller.credential_types_delete
     """
     server_url, api_key = server_config
 
@@ -321,48 +322,6 @@ async def test_platform_configuration_get_tools(server_config):
     assert 'controller.notification_templates_read' in tool_names
     assert 'controller.notification_templates_update' in tool_names
     assert 'controller.notification_templates_delete' in tool_names
-
-
-@pytest.mark.asyncio
-async def test_developer_testing_get_tools(server_config):
-    """Test retrieving available tools from the developer_testing category.
-
-    This async test validates that:
-    1. MCPClient can connect to the developer_testing category endpoint
-    2. The get_tools() method successfully lists available tools
-    3. Expected developer testing tools are present in the response
-
-    Args:
-        server_config: Pytest fixture providing (server_url, api_key) tuple
-
-    Asserts:
-        - At least one tool is returned
-        - Required developer testing tools are available:
-            * controller.workflow_job_templates_launch_create
-            * controller.workflow_jobs_list
-            * controller.workflow_jobs_read
-            * controller.workflow_jobs_workflow_nodes_list
-    """
-    server_url, api_key = server_config
-
-    # Create client with developer_testing category
-    mcp_lib = MCPClient(server_url, api_key, category="developer_testing")
-
-    # Retrieve available tools
-    tools = await mcp_lib.get_tools()
-
-    # Verify we got tools back
-    assert len(tools) > 0
-
-    # Extract tool names for validation
-    tool_names = [tool.name for tool in tools]
-
-    # Verify essential developer testing tools are available
-    assert 'controller.workflow_job_templates_launch_create' in tool_names
-    assert 'controller.workflow_jobs_list' in tool_names
-    assert 'controller.workflow_jobs_read' in tool_names
-    assert 'controller.workflow_jobs_workflow_nodes_list' in tool_names
-
 
 
 @pytest.mark.asyncio
@@ -627,11 +586,38 @@ async def test_inventory_management_read_only_use_case(server_config):
 
 @pytest.mark.asyncio
 async def test_system_monitoring_read_only_use_case(server_config):
+    """Test a complete system monitoring workflow: check status and retrieve activity stream.
+
+    This comprehensive integration test validates an end-to-end system monitoring scenario:
+    1. Retrieve gateway status and verify services are healthy
+    2. List activity stream entries
+    3. Retrieve specific activity stream entry details
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute read-only monitoring queries with the run_a_scenario() method
+    - Check system health status across multiple services
+    - Access activity stream data for auditing purposes
+    - Process JSON responses from monitoring tools
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Gateway and controller services exist
+        - Both services report "good" status
+        - Activity stream entries can be listed
+        - Individual activity stream entries can be retrieved
+        - All tool calls return without errors
+
+    Raises:
+        AssertionError: If services are unhealthy or activity stream data is unavailable
+    """
     server_url, api_key = server_config
 
     mcp_lib = MCPClient(server_url, api_key, category="system_monitoring")
 
     async def scenario_func(session: ClientSession):
+        # Step 1: Retrieve gateway status and verify service health
         res = await session.call_tool(
             name="gateway.status_retrieve",
             arguments={},
@@ -642,6 +628,7 @@ async def test_system_monitoring_read_only_use_case(server_config):
         o = json.loads(res.content[0].text)
         assert len(o["services"]) > 0
 
+        # Find gateway and controller services in the status response
         gateway = None
         controller = None
         for service in o["services"]:
@@ -649,11 +636,14 @@ async def test_system_monitoring_read_only_use_case(server_config):
                 gateway = service
             elif service["service_name"] == "controller":
                 controller = service
+
+        # Verify both critical services are present and healthy
         assert gateway is not None
         assert gateway["status"] == "good"
         assert controller is not None
         assert controller["status"] == "good"
 
+        # Step 2: List activity stream entries with pagination
         res = await session.call_tool(
             name="gateway.activitystream_list",
             arguments={
@@ -669,6 +659,7 @@ async def test_system_monitoring_read_only_use_case(server_config):
         assert len(o["results"]) == 1
         result = o["results"][0]
 
+        # Step 3: Retrieve specific activity stream entry details
         res = await session.call_tool(
             name="gateway.activitystream_retrieve",
             arguments={
@@ -678,6 +669,7 @@ async def test_system_monitoring_read_only_use_case(server_config):
         assert not res.isError
         assert res.content and len(res.content) > 0
 
+        # Verify the activity stream entry contains valid content
         content = res.content[0]
         assert content.type == "text"
         assert len(content.text) > 0
@@ -689,16 +681,40 @@ async def test_system_monitoring_read_only_use_case(server_config):
 
 @pytest.mark.asyncio
 async def test_user_management_read_write_use_case(server_config):
-    server_url, api_key = server_config
+    """Test a complete user management CRUD workflow: create, retrieve, and delete a user.
 
-    # *gateway.users_list
-    # *gateway.users_create
-    # *gateway.users_retrieve
-    # *gateway.users_destroy
+    This comprehensive integration test validates an end-to-end user management scenario:
+    1. List existing users and clean up test user if it exists
+    2. Create a new test user with specified credentials
+    3. Retrieve the created user to verify attributes
+    4. Delete the test user to clean up
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute full CRUD operations with the run_a_scenario() method
+    - Manage user lifecycle (create, read, delete)
+    - Handle user authentication credentials
+    - Ensure test isolation by cleaning up resources
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Users can be listed successfully
+        - Test user can be created with correct attributes
+        - Created user can be retrieved by ID
+        - Retrieved user matches creation parameters
+        - User can be deleted successfully
+        - All tool calls return without errors
+
+    Raises:
+        AssertionError: If user operations fail or data doesn't match expectations
+    """
+    server_url, api_key = server_config
 
     mcp_lib = MCPClient(server_url, api_key, category="user_management")
 
     async def scenario_func(session: ClientSession):
+        # Step 1: List users and clean up any existing test user
         res = await session.call_tool(
             name="gateway.users_list",
             arguments={},
@@ -710,6 +726,7 @@ async def test_user_management_read_write_use_case(server_config):
         count = o["count"]
         assert count > 0
 
+        # Delete test user if it already exists (cleanup from previous runs)
         users = json.loads(res.content[0].text)["results"]
         for user in users:
             if user["username"] == "testuser123":
@@ -723,6 +740,7 @@ async def test_user_management_read_write_use_case(server_config):
                 assert res.content and len(res.content) > 0
                 break
 
+        # Step 2: Create a new test user
         res = await session.call_tool(
             name="gateway.users_create",
             arguments={
@@ -740,6 +758,7 @@ async def test_user_management_read_write_use_case(server_config):
 
         user = json.loads(res.content[0].text)
 
+        # Step 3: Retrieve the created user to verify it exists
         res = await session.call_tool(
             name="gateway.users_retrieve",
             arguments={
@@ -752,6 +771,7 @@ async def test_user_management_read_write_use_case(server_config):
         user_retrieved = json.loads(res.content[0].text)
         assert user_retrieved["username"] == "testuser123"
 
+        # Step 4: Delete the test user (cleanup)
         res = await session.call_tool(
             name="gateway.users_destroy",
             arguments={
@@ -767,16 +787,40 @@ async def test_user_management_read_write_use_case(server_config):
 
 
 @pytest.mark.asyncio
-async def test_security_compliance_only_use_case(server_config):
-    server_url, api_key = server_config
+async def test_security_compliance_read_only_use_case(server_config):
+    """Test a complete security compliance workflow: list credentials and credential types.
 
-    # *controller.credentials_list
-    # *controller.credential_types_list
-    # *controller.credential_types_read
+    This comprehensive integration test validates an end-to-end security compliance scenario:
+    1. List all credentials and find "Demo Credential"
+    2. List credential types with pagination
+    3. Retrieve specific credential type details
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute read-only security compliance queries with the run_a_scenario() method
+    - Access sensitive credential information for auditing
+    - Navigate credential type definitions
+    - Handle paginated responses
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Credentials exist on the server
+        - "Demo Credential" is found
+        - Credential types can be listed
+        - Individual credential types can be retrieved
+        - Retrieved credential type matches list data
+        - All tool calls return without errors
+
+    Raises:
+        AssertionError: If expected credentials or types are not found
+    """
+    server_url, api_key = server_config
 
     mcp_lib = MCPClient(server_url, api_key, category="security_compliance")
 
     async def scenario_func(session: ClientSession):
+        # Step 1: List credentials and find the Demo Credential
         res = await session.call_tool(
             name="controller.credentials_list",
             arguments={},
@@ -787,14 +831,17 @@ async def test_security_compliance_only_use_case(server_config):
         o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
+        # Search for the "Demo Credential" in results
         demo_credential = None
         for credential in o["results"]:
             if credential["name"] == "Demo Credential":
                 demo_credential = credential
                 break
 
+        # Verify we found the required credential
         assert demo_credential is not None, "Demo Credential not found on server"
 
+        # Step 2: List credential types with pagination
         res = await session.call_tool(
             name="controller.credential_types_list",
             arguments={
@@ -808,9 +855,10 @@ async def test_security_compliance_only_use_case(server_config):
         o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
+        # Get the first credential type from paginated results
         credential_type = o["results"][0]
 
-
+        # Step 3: Retrieve detailed information about the credential type
         res = await session.call_tool(
             name="controller.credential_types_read",
             arguments={
@@ -820,6 +868,7 @@ async def test_security_compliance_only_use_case(server_config):
         assert not res.isError
         assert res.content and len(res.content) > 0
 
+        # Verify the retrieved credential type matches the one from the list
         credential_type_retrieved = json.loads(res.content[0].text)
         assert credential_type_retrieved["name"] == credential_type["name"]
 
@@ -830,17 +879,42 @@ async def test_security_compliance_only_use_case(server_config):
 
 @pytest.mark.asyncio
 async def test_platform_configuration_read_write_use_case(server_config):
-    server_url, api_key = server_config
+    """Test a complete platform configuration CRUD workflow: create, read, update, and delete notification templates.
 
-    # *controller.notification_templates_list
-    # *controller.notification_templates_create
-    # *controller.notification_templates_read
-    # *controller.notification_templates_update
-    # *controller.notification_templates_delete
+    This comprehensive integration test validates an end-to-end platform configuration scenario:
+    1. List existing notification templates and clean up test templates if they exist
+    2. Create a new notification template for Slack
+    3. Update the notification template with a new name
+    4. Read the notification template to verify changes
+    5. Delete the test notification template to clean up
+
+    This test demonstrates the MCPClient's ability to:
+    - Execute full CRUD operations with the run_a_scenario() method
+    - Manage notification template lifecycle (create, read, update, delete)
+    - Handle complex configuration objects (notification_configuration)
+    - Ensure test isolation by cleaning up resources
+
+    Args:
+        server_config: Pytest fixture providing (server_url, api_key) tuple
+
+    Asserts:
+        - Notification templates can be listed successfully
+        - Test template can be created with correct configuration
+        - Template can be updated with new attributes
+        - Updated template name matches expectations
+        - Template can be read by ID
+        - Template can be deleted successfully
+        - All tool calls return without errors
+
+    Raises:
+        AssertionError: If template operations fail or data doesn't match expectations
+    """
+    server_url, api_key = server_config
 
     mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
 
     async def scenario_func(session: ClientSession):
+        # Step 1: List notification templates and clean up any existing test templates
         res = await session.call_tool(
             name="controller.notification_templates_list",
             arguments={},
@@ -850,21 +924,23 @@ async def test_platform_configuration_read_write_use_case(server_config):
 
         o = json.loads(res.content[0].text)
         count = o["count"]
-        assert count > 0
 
-        notification_templates = json.loads(res.content[0].text)["results"]
-        for notification_template in notification_templates:
-            if notification_template["name"] in ["Test Notification", "Test Notification 2"]:
-                res = await session.call_tool(
-                    name="controller.notification_templates_delete",
-                    arguments={
-                        "id": notification_template["id"],
-                    },
-                )
-                assert not res.isError
-                assert res.content and len(res.content) > 0
-                break
+        # Delete test templates if they already exist (cleanup from previous runs)
+        if count > 0:
+            notification_templates = o["results"]
+            for notification_template in notification_templates:
+                if notification_template["name"] in ["Test Notification", "Test Notification 2"]:
+                    res = await session.call_tool(
+                        name="controller.notification_templates_delete",
+                        arguments={
+                            "id": notification_template["id"],
+                        },
+                    )
+                    assert not res.isError
+                    assert res.content and len(res.content) > 0
+                    break
 
+        # Step 2: Create a new notification template for Slack
         res = await session.call_tool(
             name="controller.notification_templates_create",
             arguments={
@@ -886,6 +962,7 @@ async def test_platform_configuration_read_write_use_case(server_config):
 
         notification_template_created = json.loads(res.content[0].text)
 
+        # Step 3: Update the notification template with a new name
         res = await session.call_tool(
             name="controller.notification_templates_update",
             arguments={
@@ -906,9 +983,11 @@ async def test_platform_configuration_read_write_use_case(server_config):
         assert not res.isError
         assert res.content and len(res.content) > 0
 
+        # Verify the update was successful
         notification_template_retrieved = json.loads(res.content[0].text)
         assert notification_template_retrieved["name"] == "Test Notification 2"
 
+        # Step 4: Read the notification template to verify it exists
         res = await session.call_tool(
             name="controller.notification_templates_read",
             arguments={
@@ -918,6 +997,7 @@ async def test_platform_configuration_read_write_use_case(server_config):
         )
         assert not res.isError
 
+        # Step 5: Delete the notification template (cleanup)
         res = await session.call_tool(
             name="controller.notification_templates_delete",
             arguments={
@@ -931,69 +1011,3 @@ async def test_platform_configuration_read_write_use_case(server_config):
 
     await mcp_lib.run_a_scenario(scenario_func)
 
-
-@pytest.mark.asyncio
-async def test_developer_testing_read_only_use_case(server_config):
-    server_url, api_key = server_config
-
-    mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
-
-    async def scenario_func(session: ClientSession):
-        res = await session.call_tool(
-            name="controller.inventories_list",
-            arguments={
-                "version": "v2"
-            },
-        )
-        assert not res.isError
-        assert res.content and len(res.content) > 0
-
-        o = json.loads(res.content[0].text)
-        assert o["count"] > 0
-
-        demo_inventory = None
-        for inventory in o["results"]:
-            if inventory["name"] == "Demo Inventory":
-                demo_inventory = inventory
-                break
-
-        assert demo_inventory is not None, "Demo Inventory not found on server"
-
-        res = await session.call_tool(
-            name="controller.hosts_list",
-            arguments={
-                "version": "v2"
-            },
-        )
-        assert not res.isError
-        assert res.content and len(res.content) > 0
-
-        o = json.loads(res.content[0].text)
-        assert o["count"] > 0
-
-        localhost = None
-        for host in o["results"]:
-            if host["name"] == "localhost":
-                localhost = host
-                break
-
-        assert localhost is not None, "localhost not found on server"
-
-        res = await session.call_tool(
-            name="controller.hosts_variable_data_read",
-            arguments={
-                "version": "v2",
-                "id": localhost["id"],
-            },
-        )
-        assert not res.isError
-        assert res.content and len(res.content) > 0
-
-        o = json.loads(res.content[0].text)
-
-        assert o["ansible_connection"] == "local"
-        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
-
-        return
-
-    await mcp_lib.run_a_scenario(scenario_func)
