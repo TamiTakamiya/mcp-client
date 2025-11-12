@@ -418,7 +418,7 @@ async def test_job_management_read_write_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse JSON response
-        o = json.loads("".join(res.content[0].text))
+        o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
         # Search for the "Demo Job Template" in results
@@ -446,7 +446,7 @@ async def test_job_management_read_write_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse the launched job details
-        job_launched = json.loads("".join(res.content[0].text))
+        job_launched = json.loads(res.content[0].text)
         assert job_launched["name"] == "Demo Job Template"
 
         # Step 3: Poll job status until completion (with timeout protection)
@@ -468,7 +468,7 @@ async def test_job_management_read_write_use_case(server_config):
             assert res.content and len(res.content) > 0
 
             # Parse job status
-            o = json.loads("".join(res.content[0].text))
+            o = json.loads(res.content[0].text)
 
             # Check if job completed successfully
             if o["status"] == "successful":
@@ -497,7 +497,7 @@ async def test_job_management_read_write_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse job output
-        o = json.loads("".join(res.content[0].text))
+        o = json.loads(res.content[0].text)
 
         # Verify expected content in job output
         # "PLAY [Hello World Sample]" is from the Demo Job Template playbook
@@ -560,7 +560,7 @@ async def test_inventory_management_read_only_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse JSON response
-        o = json.loads("".join(res.content[0].text))
+        o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
         # Search for the "Demo Inventory" in results
@@ -586,7 +586,7 @@ async def test_inventory_management_read_only_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse JSON response
-        o = json.loads("".join(res.content[0].text))
+        o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
         # Search for the "localhost" host in results
@@ -613,7 +613,7 @@ async def test_inventory_management_read_only_use_case(server_config):
         assert res.content and len(res.content) > 0
 
         # Parse JSON response containing host variables
-        o = json.loads("".join(res.content[0].text))
+        o = json.loads(res.content[0].text)
 
         # Verify expected Ansible configuration variables
         # ansible_connection should be "local" for localhost
@@ -626,3 +626,344 @@ async def test_inventory_management_read_only_use_case(server_config):
     # Execute the scenario and wait for completion
     await mcp_lib.run_a_scenario(scenario_func)
 
+
+@pytest.mark.asyncio
+async def test_system_monitoring_read_only_use_case(server_config):
+    server_url, api_key = server_config
+
+    mcp_lib = MCPClient(server_url, api_key, category="system_monitoring")
+
+    async def scenario_func(session: ClientSession):
+        res = await session.call_tool(
+            name="gateway.status_retrieve",
+            arguments={},
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert len(o["services"]) > 0
+
+        gateway = None
+        controller = None
+        for service in o["services"]:
+            if service["service_name"] == "gateway":
+                gateway = service
+            elif service["service_name"] == "controller":
+                controller = service
+        assert gateway is not None
+        assert gateway["status"] == "good"
+        assert controller is not None
+        assert controller["status"] == "good"
+
+        res = await session.call_tool(
+            name="gateway.activitystream_list",
+            arguments={
+                "page": 1,
+                "page_size": 1,
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o
+        assert len(o["results"]) == 1
+        result = o["results"][0]
+
+        res = await session.call_tool(
+            name="gateway.activitystream_retrieve",
+            arguments={
+                "id": result["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        content = res.content[0]
+        assert content.type == "text"
+        assert len(content.text) > 0
+
+        return
+
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_user_management_read_write_use_case(server_config):
+    server_url, api_key = server_config
+
+    # *gateway.users_list
+    # *gateway.users_create
+    # *gateway.users_retrieve
+    # *gateway.users_destroy
+
+    mcp_lib = MCPClient(server_url, api_key, category="user_management")
+
+    async def scenario_func(session: ClientSession):
+        res = await session.call_tool(
+            name="gateway.users_list",
+            arguments={},
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        count = o["count"]
+        assert count > 0
+
+        users = json.loads(res.content[0].text)["results"]
+        for user in users:
+            if user["username"] == "testuser123":
+                res = await session.call_tool(
+                    name="gateway.users_destroy",
+                    arguments={
+                        "id": user["id"],
+                    },
+                )
+                assert not res.isError
+                assert res.content and len(res.content) > 0
+                break
+
+        res = await session.call_tool(
+            name="gateway.users_create",
+            arguments={
+                "requestBody": {
+                    "username": "testuser123",
+                    "email": "testuser123@localhost",
+                    "password": "password123",
+                    "is_superuser": False,
+                    "is_platform_auditor": False,
+                },
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        user = json.loads(res.content[0].text)
+
+        res = await session.call_tool(
+            name="gateway.users_retrieve",
+            arguments={
+                "id": user["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        user_retrieved = json.loads(res.content[0].text)
+        assert user_retrieved["username"] == "testuser123"
+
+        res = await session.call_tool(
+            name="gateway.users_destroy",
+            arguments={
+                "id": user["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        return
+
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_security_compliance_only_use_case(server_config):
+    server_url, api_key = server_config
+
+    mcp_lib = MCPClient(server_url, api_key, category="security_compliance")
+
+    async def scenario_func(session: ClientSession):
+        res = await session.call_tool(
+            name="controller.inventories_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        demo_inventory = None
+        for inventory in o["results"]:
+            if inventory["name"] == "Demo Inventory":
+                demo_inventory = inventory
+                break
+
+        assert demo_inventory is not None, "Demo Inventory not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        localhost = None
+        for host in o["results"]:
+            if host["name"] == "localhost":
+                localhost = host
+                break
+
+        assert localhost is not None, "localhost not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_variable_data_read",
+            arguments={
+                "version": "v2",
+                "id": localhost["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+
+        assert o["ansible_connection"] == "local"
+        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
+
+        return
+
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_platform_configuration_read_only_use_case(server_config):
+    server_url, api_key = server_config
+
+    mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
+
+    async def scenario_func(session: ClientSession):
+        res = await session.call_tool(
+            name="controller.inventories_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        demo_inventory = None
+        for inventory in o["results"]:
+            if inventory["name"] == "Demo Inventory":
+                demo_inventory = inventory
+                break
+
+        assert demo_inventory is not None, "Demo Inventory not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        localhost = None
+        for host in o["results"]:
+            if host["name"] == "localhost":
+                localhost = host
+                break
+
+        assert localhost is not None, "localhost not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_variable_data_read",
+            arguments={
+                "version": "v2",
+                "id": localhost["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+
+        assert o["ansible_connection"] == "local"
+        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
+
+        return
+
+    await mcp_lib.run_a_scenario(scenario_func)
+
+
+@pytest.mark.asyncio
+async def test_developer_testing_read_only_use_case(server_config):
+    server_url, api_key = server_config
+
+    mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
+
+    async def scenario_func(session: ClientSession):
+        res = await session.call_tool(
+            name="controller.inventories_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        demo_inventory = None
+        for inventory in o["results"]:
+            if inventory["name"] == "Demo Inventory":
+                demo_inventory = inventory
+                break
+
+        assert demo_inventory is not None, "Demo Inventory not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_list",
+            arguments={
+                "version": "v2"
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        localhost = None
+        for host in o["results"]:
+            if host["name"] == "localhost":
+                localhost = host
+                break
+
+        assert localhost is not None, "localhost not found on server"
+
+        res = await session.call_tool(
+            name="controller.hosts_variable_data_read",
+            arguments={
+                "version": "v2",
+                "id": localhost["id"],
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+
+        assert o["ansible_connection"] == "local"
+        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
+
+        return
+
+    await mcp_lib.run_a_scenario(scenario_func)
