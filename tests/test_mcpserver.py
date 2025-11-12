@@ -259,7 +259,6 @@ async def test_security_compliance_get_tools(server_config):
             * controller.credentials_list
             * controller.credential_types_list
             * controller.credential_types_read
-            * controller.credential_types_delete
     """
     server_url, api_key = server_config
 
@@ -279,7 +278,6 @@ async def test_security_compliance_get_tools(server_config):
     assert 'controller.credentials_list' in tool_names
     assert 'controller.credential_types_list' in tool_names
     assert 'controller.credential_types_read' in tool_names
-    assert 'controller.credential_types_delete' in tool_names
 
 
 @pytest.mark.asyncio
@@ -772,13 +770,36 @@ async def test_user_management_read_write_use_case(server_config):
 async def test_security_compliance_only_use_case(server_config):
     server_url, api_key = server_config
 
+    # *controller.credentials_list
+    # *controller.credential_types_list
+    # *controller.credential_types_read
+
     mcp_lib = MCPClient(server_url, api_key, category="security_compliance")
 
     async def scenario_func(session: ClientSession):
         res = await session.call_tool(
-            name="controller.inventories_list",
+            name="controller.credentials_list",
+            arguments={},
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        o = json.loads(res.content[0].text)
+        assert o["count"] > 0
+
+        demo_credential = None
+        for credential in o["results"]:
+            if credential["name"] == "Demo Credential":
+                demo_credential = credential
+                break
+
+        assert demo_credential is not None, "Demo Credential not found on server"
+
+        res = await session.call_tool(
+            name="controller.credential_types_list",
             arguments={
-                "version": "v2"
+                "page": 1,
+                "page_size": 1
             },
         )
         assert not res.isError
@@ -787,48 +808,20 @@ async def test_security_compliance_only_use_case(server_config):
         o = json.loads(res.content[0].text)
         assert o["count"] > 0
 
-        demo_inventory = None
-        for inventory in o["results"]:
-            if inventory["name"] == "Demo Inventory":
-                demo_inventory = inventory
-                break
+        credential_type = o["results"][0]
 
-        assert demo_inventory is not None, "Demo Inventory not found on server"
 
         res = await session.call_tool(
-            name="controller.hosts_list",
+            name="controller.credential_types_read",
             arguments={
-                "version": "v2"
+                "id": credential_type["id"],
             },
         )
         assert not res.isError
         assert res.content and len(res.content) > 0
 
-        o = json.loads(res.content[0].text)
-        assert o["count"] > 0
-
-        localhost = None
-        for host in o["results"]:
-            if host["name"] == "localhost":
-                localhost = host
-                break
-
-        assert localhost is not None, "localhost not found on server"
-
-        res = await session.call_tool(
-            name="controller.hosts_variable_data_read",
-            arguments={
-                "version": "v2",
-                "id": localhost["id"],
-            },
-        )
-        assert not res.isError
-        assert res.content and len(res.content) > 0
-
-        o = json.loads(res.content[0].text)
-
-        assert o["ansible_connection"] == "local"
-        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
+        credential_type_retrieved = json.loads(res.content[0].text)
+        assert credential_type_retrieved["name"] == credential_type["name"]
 
         return
 
@@ -836,66 +829,103 @@ async def test_security_compliance_only_use_case(server_config):
 
 
 @pytest.mark.asyncio
-async def test_platform_configuration_read_only_use_case(server_config):
+async def test_platform_configuration_read_write_use_case(server_config):
     server_url, api_key = server_config
+
+    # *controller.notification_templates_list
+    # *controller.notification_templates_create
+    # *controller.notification_templates_read
+    # *controller.notification_templates_update
+    # *controller.notification_templates_delete
 
     mcp_lib = MCPClient(server_url, api_key, category="platform_configuration")
 
     async def scenario_func(session: ClientSession):
         res = await session.call_tool(
-            name="controller.inventories_list",
-            arguments={
-                "version": "v2"
-            },
+            name="controller.notification_templates_list",
+            arguments={},
         )
         assert not res.isError
         assert res.content and len(res.content) > 0
 
         o = json.loads(res.content[0].text)
-        assert o["count"] > 0
+        count = o["count"]
+        assert count > 0
 
-        demo_inventory = None
-        for inventory in o["results"]:
-            if inventory["name"] == "Demo Inventory":
-                demo_inventory = inventory
+        notification_templates = json.loads(res.content[0].text)["results"]
+        for notification_template in notification_templates:
+            if notification_template["name"] in ["Test Notification", "Test Notification 2"]:
+                res = await session.call_tool(
+                    name="controller.notification_templates_delete",
+                    arguments={
+                        "id": notification_template["id"],
+                    },
+                )
+                assert not res.isError
+                assert res.content and len(res.content) > 0
                 break
 
-        assert demo_inventory is not None, "Demo Inventory not found on server"
-
         res = await session.call_tool(
-            name="controller.hosts_list",
-            arguments={
-                "version": "v2"
-            },
-        )
-        assert not res.isError
-        assert res.content and len(res.content) > 0
-
-        o = json.loads(res.content[0].text)
-        assert o["count"] > 0
-
-        localhost = None
-        for host in o["results"]:
-            if host["name"] == "localhost":
-                localhost = host
-                break
-
-        assert localhost is not None, "localhost not found on server"
-
-        res = await session.call_tool(
-            name="controller.hosts_variable_data_read",
+            name="controller.notification_templates_create",
             arguments={
                 "version": "v2",
-                "id": localhost["id"],
+                "requestBody": {
+                    "name": "Test Notification",
+                    "description": "Test Slack notification template",
+                    "organization": 1,
+                    "notification_type": "slack",
+                    "notification_configuration":{
+                        "token":"xoxb - test - token - placeholder",
+                        "channels": [ "# general" ],
+                    },
+                },
             },
         )
         assert not res.isError
         assert res.content and len(res.content) > 0
 
-        o = json.loads(res.content[0].text)
+        notification_template_created = json.loads(res.content[0].text)
 
-        assert o["ansible_connection"] == "local"
-        assert o["ansible_python_interpreter"] == "{{ ansible_playbook_python }}"
+        res = await session.call_tool(
+            name="controller.notification_templates_update",
+            arguments={
+                "version": "v2",
+                "id": notification_template_created["id"],
+                "requestBody": {
+                    "name": "Test Notification 2",
+                    "description": "Test Slack notification template",
+                    "organization": 1,
+                    "notification_type": "slack",
+                    "notification_configuration":{
+                        "token":"xoxb - test - token - placeholder",
+                        "channels": [ "# general" ],
+                    },
+                },
+            },
+        )
+        assert not res.isError
+        assert res.content and len(res.content) > 0
+
+        notification_template_retrieved = json.loads(res.content[0].text)
+        assert notification_template_retrieved["name"] == "Test Notification 2"
+
+        res = await session.call_tool(
+            name="controller.notification_templates_read",
+            arguments={
+                "version": "v2",
+                "id": notification_template_created["id"],
+            },
+        )
+        assert not res.isError
+
+        res = await session.call_tool(
+            name="controller.notification_templates_delete",
+            arguments={
+                "version": "v2",
+                "id": notification_template_created["id"],
+            },
+        )
+        assert not res.isError
 
         return
 
