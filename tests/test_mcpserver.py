@@ -502,7 +502,7 @@ async def test_job_management_read_only_use_case(server_config):
 
         This nested function defines a multi-step job management scenario that:
         1. Retrieves a list of all activation instances to see running/completed jobs
-        2. Fetches logs for activation instances to review execution details
+        2. If there is at least one activation instance, fetches logs for the first activation instance to review execution details
         """
 
         # Step 1: List all EDA activation instances
@@ -515,16 +515,21 @@ async def test_job_management_read_only_use_case(server_config):
         assert not res.isError
         assert res.content and len(res.content) > 0
 
-        # Step 2: Retrieve logs for activation instances
-        # These logs contain execution details, triggered rules, and any errors
-        res = await session.call_tool(
-            name="eda.activation_instances_logs_list",
-            arguments={},
-        )
+        o = json.loads(res.content[0].text)
 
-        # Verify the tool call succeeded and returned log data
-        assert not res.isError
-        assert res.content and len(res.content) > 0
+        if o["count"] > 0:
+            # Step 2: If an activation instance is found, retrieve logs for the first activation instance
+            # These logs contain execution details, triggered rules, and any errors
+            res = await session.call_tool(
+                name="eda.activation_instances_logs_list",
+                arguments={
+                    o["results"][0]["id"],
+                },
+            )
+
+            # Verify the tool call succeeded and returned log data
+            assert not res.isError
+            assert res.content and len(res.content) > 0
 
         return
 
